@@ -1,0 +1,133 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: asyncorders-rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      asyncorders-network:
+        aliases:
+          - rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  ms-ventas-producer:
+    image: marexz/ms-ventas-producer:latest
+    container_name: ms-ventas-producer
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_APPLICATION_NAME: ms-ventas-producer
+      SERVER_PORT: 8080
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_EXCHANGE_VENTAS: exchange.ventas
+      RABBITMQ_EXCHANGE_NOTIFICACIONES: exchange.notificaciones
+      RABBITMQ_EXCHANGE_DLX: exchange.dlx
+      RABBITMQ_QUEUE_DOCUMENTOS: cola.documentos
+      RABBITMQ_QUEUE_NOTIFICACIONES: cola.notificaciones
+      RABBITMQ_QUEUE_DOCUMENTOS_DLQ: cola.documentos.dlq
+      RABBITMQ_QUEUE_NOTIFICACIONES_DLQ: cola.notificaciones.dlq
+      RABBITMQ_ROUTING_DOCUMENTO_GENERAR: venta.documento.generar
+      RABBITMQ_ROUTING_NOTIFICACION_ENVIAR: venta.notificacion.enviar
+      RABBITMQ_ROUTING_ERROR_DOCUMENTO: error.documento
+      RABBITMQ_ROUTING_ERROR_NOTIFICACION: error.notificacion
+      LOGGING_LEVEL_CL_DUOC_ASYNCORDERS: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AMQP: DEBUG
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - asyncorders-network
+    restart: unless-stopped
+
+  ms-documentos-consumer:
+    image: marexz/ms-documentos-consumer:latest
+    container_name: ms-documentos-consumer
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: ms-documentos-consumer
+      SERVER_PORT: 8082
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE: manual
+      SPRING_RABBITMQ_LISTENER_SIMPLE_PREFETCH: 1
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED: true
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_INITIAL_INTERVAL: 3000
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS: 3
+      RABBITMQ_EXCHANGE_VENTAS: exchange.ventas
+      RABBITMQ_EXCHANGE_DLX: exchange.dlx
+      RABBITMQ_QUEUE_DOCUMENTOS: cola.documentos
+      RABBITMQ_QUEUE_DOCUMENTOS_DLQ: cola.documentos.dlq
+      RABBITMQ_ROUTING_DOCUMENTO_GENERAR: venta.documento.generar
+      RABBITMQ_ROUTING_ERROR_DOCUMENTO: error.documento
+      LOGGING_LEVEL_CL_DUOC_ASYNCORDERS: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AMQP: DEBUG
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - asyncorders-network
+    restart: unless-stopped
+
+  ms-notificaciones-consumer:
+    image: marexz/ms-notificaciones-consumer:latest
+    container_name: ms-notificaciones-consumer
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_APPLICATION_NAME: ms-notificaciones-consumer
+      SERVER_PORT: 8083
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_ACKNOWLEDGE_MODE: manual
+      SPRING_RABBITMQ_LISTENER_SIMPLE_PREFETCH: 1
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_ENABLED: true
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_INITIAL_INTERVAL: 3000
+      SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS: 3
+      RABBITMQ_EXCHANGE_NOTIFICACIONES: exchange.notificaciones
+      RABBITMQ_EXCHANGE_DLX: exchange.dlx
+      RABBITMQ_QUEUE_NOTIFICACIONES: cola.notificaciones
+      RABBITMQ_QUEUE_NOTIFICACIONES_DLQ: cola.notificaciones.dlq
+      RABBITMQ_ROUTING_NOTIFICACION_ENVIAR: venta.notificacion.enviar
+      RABBITMQ_ROUTING_ERROR_NOTIFICACION: error.notificacion
+      LOGGING_LEVEL_CL_DUOC_ASYNCORDERS: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AMQP: DEBUG
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - asyncorders-network
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+    name: asyncorders-rabbitmq-data
+
+networks:
+  asyncorders-network:
+    name: asyncorders-network
+    driver: bridge

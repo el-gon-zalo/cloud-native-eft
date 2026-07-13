@@ -1,0 +1,124 @@
+name: CI/CD AsyncOrders
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '17'
+  DOCKERHUB_NAMESPACE: profegabogrobier
+
+jobs:
+  build-and-push:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Build ms-ventas-producer
+        working-directory: ms-ventas-producer
+        run: mvn -B -DskipTests package
+
+      - name: Build ms-documentos-consumer
+        working-directory: ms-documentos-consumer
+        run: mvn -B -DskipTests package
+
+      - name: Build ms-notificaciones-consumer
+        working-directory: ms-notificaciones-consumer
+        run: mvn -B -DskipTests package
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ms-ventas-producer image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ms-ventas-producer
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-ventas-producer:latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-ventas-producer:${{ github.sha }}
+
+      - name: Build and push ms-documentos-consumer image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ms-documentos-consumer
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-documentos-consumer:latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-documentos-consumer:${{ github.sha }}
+
+      - name: Build and push ms-notificaciones-consumer image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ms-notificaciones-consumer
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-notificaciones-consumer:latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-notificaciones-consumer:${{ github.sha }}
+
+  deploy-ec2:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create deployment directory on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: mkdir -p ~/cloudnative-taller3
+
+      - name: Copy Docker Compose file to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: docker-compose.ec2.yml
+          target: ~/cloudnative-taller3
+
+      - name: Pull and restart services on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/cloudnative-taller3
+            printf 'RABBITMQ_USERNAME=%s\n' '${{ secrets.RABBITMQ_USERNAME }}' > .env
+            printf 'RABBITMQ_PASSWORD=%s\n' '${{ secrets.RABBITMQ_PASSWORD }}' >> .env
+            printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
+            docker rm -f rabbitmq-cloudnative || true
+            docker compose -f docker-compose.ec2.yml pull
+            docker compose -f docker-compose.ec2.yml up -d --remove-orphans
+            until docker exec asyncorders-rabbitmq rabbitmq-diagnostics ping; do sleep 5; done
+            docker exec asyncorders-rabbitmq rabbitmqctl add_user '${{ secrets.RABBITMQ_USERNAME }}' '${{ secrets.RABBITMQ_PASSWORD }}' || docker exec asyncorders-rabbitmq rabbitmqctl change_password '${{ secrets.RABBITMQ_USERNAME }}' '${{ secrets.RABBITMQ_PASSWORD }}'
+            docker exec asyncorders-rabbitmq rabbitmqctl set_user_tags '${{ secrets.RABBITMQ_USERNAME }}' administrator
+            docker exec asyncorders-rabbitmq rabbitmqctl set_permissions -p / '${{ secrets.RABBITMQ_USERNAME }}' '.*' '.*' '.*'
+            docker compose -f docker-compose.ec2.yml restart ms-ventas-producer ms-documentos-consumer ms-notificaciones-consumer
+            docker image prune -f
