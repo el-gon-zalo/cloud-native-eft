@@ -113,7 +113,7 @@ jobs:
             printf 'RABBITMQ_USERNAME=%s\n' '${{ secrets.RABBITMQ_USERNAME }}' > .env
             printf 'RABBITMQ_PASSWORD=%s\n' '${{ secrets.RABBITMQ_PASSWORD }}' >> .env
             printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
-            docker rm -f rabbitmq-cloudnative || true
+            docker rm -f asyncorders-rabbitmq || true
             docker compose -f docker-compose.ec2.yml pull
             docker compose -f docker-compose.ec2.yml up -d --remove-orphans
             until docker exec asyncorders-rabbitmq rabbitmq-diagnostics ping; do sleep 5; done
