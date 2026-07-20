@@ -9,7 +9,7 @@ on:
 
 env:
   JAVA_VERSION: '17'
-  DOCKERHUB_NAMESPACE: profegabogrobier
+  DOCKERHUB_NAMESPACE: marexz
 
 jobs:
   build-and-push:
@@ -90,7 +90,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: mkdir -p ~/cloudnative-taller3
+          script: mkdir -p ~/cloudnative-eft-main
 
       - name: Copy Docker Compose file to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -99,7 +99,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: docker-compose.ec2.yml
-          target: ~/cloudnative-taller3
+          target: ~/cloudnative-eft-main
 
       - name: Pull and restart services on EC2
         uses: appleboy/ssh-action@v1.2.0
@@ -109,7 +109,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-            cd ~/cloudnative-taller3
+            cd ~/cloudnative-eft-main
             printf 'RABBITMQ_USERNAME=%s\n' '${{ secrets.RABBITMQ_USERNAME }}' > .env
             printf 'RABBITMQ_PASSWORD=%s\n' '${{ secrets.RABBITMQ_PASSWORD }}' >> .env
             printf '%s' '${{ secrets.DOCKERHUB_TOKEN }}' | docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
