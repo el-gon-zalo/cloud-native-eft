@@ -27,16 +27,16 @@ services:
         max-file: "3"
     restart: unless-stopped
 
-  ms-ventas-producer:
+  ms-cursos-producer:
     build:
-      context: ./ms-ventas-producer
+      context: ./ms-cursos-producer
       dockerfile: Dockerfile
-    image: marexz/ms-ventas-producer:latest
-    container_name: ms-ventas-producer
+    image: marexz/ms-cursos-producer:latest
+    container_name: ms-cursos-producer
     ports:
       - "8080:8080"
     environment:
-      SPRING_APPLICATION_NAME: ms-ventas-producer
+      SPRING_APPLICATION_NAME: ms-cursos-producer
       SERVER_PORT: 8080
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
@@ -45,14 +45,23 @@ services:
       RABBITMQ_EXCHANGE_VENTAS: exchange.ventas
       RABBITMQ_EXCHANGE_NOTIFICACIONES: exchange.notificaciones
       RABBITMQ_EXCHANGE_DLX: exchange.dlx
+      RABBITMQ_EXCHANGE_CURSOS: exchange.cursos
       RABBITMQ_QUEUE_DOCUMENTOS: cola.documentos
       RABBITMQ_QUEUE_NOTIFICACIONES: cola.notificaciones
       RABBITMQ_QUEUE_DOCUMENTOS_DLQ: cola.documentos.dlq
       RABBITMQ_QUEUE_NOTIFICACIONES_DLQ: cola.notificaciones.dlq
+      RABBITMQ_QUEUE_CURSOS: cola.cursos
+      RABBITMQ_QUEUE_CURSOS_DLQ: cola.cursos.dlq
       RABBITMQ_ROUTING_DOCUMENTO_GENERAR: venta.documento.generar
       RABBITMQ_ROUTING_NOTIFICACION_ENVIAR: venta.notificacion.enviar
       RABBITMQ_ROUTING_ERROR_DOCUMENTO: error.documento
       RABBITMQ_ROUTING_ERROR_NOTIFICACION: error.notificacion
+      RABBITMQ_ROUTING_CURSO_DOCUMENTO_GENERAR: curso.documento.generar
+      RABBITMQ_ROUTING_ERROR_CURSO: error.curso
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-bucket-guias-despacho-dev}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
       LOGGING_LEVEL_CL_DUOC_ASYNCORDERS: DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AMQP: DEBUG
     depends_on:
@@ -62,16 +71,16 @@ services:
       - asyncorders-network
     restart: unless-stopped
 
-  ms-documentos-consumer:
+  ms-cursos-consumer:
     build:
-      context: ./ms-documentos-consumer
+      context: ./ms-cursos-consumer
       dockerfile: Dockerfile
-    image: marexz/ms-documentos-consumer:latest
-    container_name: ms-documentos-consumer
+    image: marexz/ms-cursos-consumer:latest
+    container_name: ms-cursos-consumer
     ports:
       - "8082:8082"
     environment:
-      SPRING_APPLICATION_NAME: ms-documentos-consumer
+      SPRING_APPLICATION_NAME: ms-cursos-consumer
       SERVER_PORT: 8082
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
@@ -84,10 +93,15 @@ services:
       SPRING_RABBITMQ_LISTENER_SIMPLE_RETRY_MAX_ATTEMPTS: 3
       RABBITMQ_EXCHANGE_VENTAS: exchange.ventas
       RABBITMQ_EXCHANGE_DLX: exchange.dlx
+      RABBITMQ_EXCHANGE_CURSOS: exchange.cursos
       RABBITMQ_QUEUE_DOCUMENTOS: cola.documentos
       RABBITMQ_QUEUE_DOCUMENTOS_DLQ: cola.documentos.dlq
+      RABBITMQ_QUEUE_GUIAS: cola.guias
+      RABBITMQ_QUEUE_CURSOS: cola.cursos
+      RABBITMQ_QUEUE_CURSOS_DLQ: cola.cursos.dlq
       RABBITMQ_ROUTING_DOCUMENTO_GENERAR: venta.documento.generar
       RABBITMQ_ROUTING_ERROR_DOCUMENTO: error.documento
+      RABBITMQ_ROUTING_CURSO_DOCUMENTO_GENERAR: curso.documento.generar
       LOGGING_LEVEL_CL_DUOC_ASYNCORDERS: DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AMQP: DEBUG
     depends_on:

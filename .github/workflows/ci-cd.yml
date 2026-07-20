@@ -27,12 +27,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
 
-      - name: Build ms-ventas-producer
-        working-directory: ms-ventas-producer
+      - name: Build ms-cursos-producer
+        working-directory: ms-cursos-producer
         run: mvn -B -DskipTests package
 
-      - name: Build ms-documentos-consumer
-        working-directory: ms-documentos-consumer
+      - name: Build ms-cursos-consumer
+        working-directory: ms-cursos-consumer
         run: mvn -B -DskipTests package
 
       - name: Build ms-notificaciones-consumer
@@ -48,23 +48,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push ms-ventas-producer image
+      - name: Build and push ms-cursos-producer image
         uses: docker/build-push-action@v6
         with:
-          context: ./ms-ventas-producer
+          context: ./ms-cursos-producer
           push: true
           tags: |
-            ${{ env.DOCKERHUB_NAMESPACE }}/ms-ventas-producer:latest
-            ${{ env.DOCKERHUB_NAMESPACE }}/ms-ventas-producer:${{ github.sha }}
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-cursos-producer:latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-cursos-producer:${{ github.sha }}
 
-      - name: Build and push ms-documentos-consumer image
+      - name: Build and push ms-cursos-consumer image
         uses: docker/build-push-action@v6
         with:
-          context: ./ms-documentos-consumer
+          context: ./ms-cursos-consumer
           push: true
           tags: |
-            ${{ env.DOCKERHUB_NAMESPACE }}/ms-documentos-consumer:latest
-            ${{ env.DOCKERHUB_NAMESPACE }}/ms-documentos-consumer:${{ github.sha }}
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-cursos-consumer:latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ms-cursos-consumer:${{ github.sha }}
 
       - name: Build and push ms-notificaciones-consumer image
         uses: docker/build-push-action@v6
@@ -120,5 +120,5 @@ jobs:
             docker exec asyncorders-rabbitmq rabbitmqctl add_user '${{ secrets.RABBITMQ_USERNAME }}' '${{ secrets.RABBITMQ_PASSWORD }}' || docker exec asyncorders-rabbitmq rabbitmqctl change_password '${{ secrets.RABBITMQ_USERNAME }}' '${{ secrets.RABBITMQ_PASSWORD }}'
             docker exec asyncorders-rabbitmq rabbitmqctl set_user_tags '${{ secrets.RABBITMQ_USERNAME }}' administrator
             docker exec asyncorders-rabbitmq rabbitmqctl set_permissions -p / '${{ secrets.RABBITMQ_USERNAME }}' '.*' '.*' '.*'
-            docker compose -f docker-compose.ec2.yml restart ms-ventas-producer ms-documentos-consumer ms-notificaciones-consumer
+            docker compose -f docker-compose.ec2.yml restart ms-cursos-producer ms-cursos-consumer ms-notificaciones-consumer
             docker image prune -f
